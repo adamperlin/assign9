@@ -1,4 +1,4 @@
-module Tests exposing (interpTests, parserTests)
+module Tests exposing (interpTests, parserTests, topInterpTests)
 
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
@@ -127,4 +127,15 @@ interpTests  = describe "tests for interp module" [
                     Ok expr -> Expect.equal (Ok (CloV [] (IdC "z") (Dict.fromList [("z", NumV 7)])))
                                 (interp expr Dict.empty)
                     Err e -> Expect.fail ("unexpected parse error")
+    ]]
+
+topInterpTests: Test
+topInterpTests = describe "tests for top-interp" [
+    describe "test num interp" [
+        test "top interp 5" <|
+        \_ -> Expect.equal (Ok "5") (topInterp "5")
+    ],
+    describe "test closure top interp" [
+        test "top interp closure" <|
+        \_ -> Expect.equal (Ok "#<procedure>") (topInterp "{local {z 7} in {() => z}}")
     ]]

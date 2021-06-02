@@ -19,7 +19,6 @@ type Value = NumV Float
     | BoolV Bool
     | CloV (List String) Expr Env
     | PrimopV String
-    | NullV
 
 type InterpError = InterpError String
 show: InterpError -> String
@@ -72,3 +71,19 @@ interp expr env =
                                                     interp cloBody newEnv)
                             PrimopV op -> Ok (NumV 0)
                             _ -> Err (InterpError "Invalid function call"))
+
+serialize: Value -> String
+serialize val =
+    case val of
+       StringV str -> str
+       NumV num -> String.fromFloat num
+       BoolV b -> if b then "true" else "false"
+       CloV _ _ _ -> "#<procedure>"
+       PrimopV _ -> "#<primop>"
+
+
+topInterp: String -> Result InterpError String
+topInterp expr =
+    case parse expr of
+       Ok ast -> bindResult (interp ast Dict.empty) (serialize >> Ok)
+       Err _ -> Err (InterpError "Parse Error")
