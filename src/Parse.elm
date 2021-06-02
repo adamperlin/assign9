@@ -1,5 +1,6 @@
 module Parse exposing (..)
 
+{-
 import Parser exposing (
     Parser, (|.), (|=), 
     succeed, number,  symbol, 
@@ -8,6 +9,10 @@ import Parser exposing (
     run, 
     lazy,
     keyword,andThen)
+    -}
+
+import Parser exposing (..)
+
 import Parser exposing (DeadEnd)
 import List exposing (concat)
 import List exposing (concatMap)

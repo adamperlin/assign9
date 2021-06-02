@@ -1,10 +1,14 @@
-module Tests exposing (..)
+module Tests exposing (interpTests, parserTests)
 
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
 import Test exposing (..)
 import Parse exposing (..)
 import Parser exposing (DeadEnd)
+import Interp exposing (..) 
+import Dict exposing (..)
+import Debug
+
 bigTest = """
 {local
   {countToZeroPos {(countToZeroPos x) =>
@@ -105,3 +109,22 @@ parserTests = describe "tests for parser module"
                 test "big boy" <|
                 \_ -> Expect.ok (parse bigTest)
             ]]
+
+flip: (a -> b -> c) -> b -> a -> c
+flip f = \b a -> f a b
+interpTests: Test
+interpTests  = describe "tests for interp module" [
+    describe "test interp numC" [
+        test "eval numC" <|
+        \_ -> Expect.equal (Ok (NumV 5)) (interp (NumC 5) Dict.empty)],
+    describe "test interp stringC" [
+        test "eval stringC" <|
+        \_ -> Expect.equal (Ok (StringV "blah")) (interp (StringC "blah") Dict.empty)
+    ],
+    describe "test interp cloV" [
+        test "interp cloV" <|
+        \_ ->  case parse "{local {z 7} in {() => z}}" of
+                    Ok expr -> Expect.equal (Ok (CloV [] (IdC "z") (Dict.fromList [("z", NumV 7)])))
+                                (interp expr Dict.empty)
+                    Err e -> Expect.fail ("unexpected parse error")
+    ]]
