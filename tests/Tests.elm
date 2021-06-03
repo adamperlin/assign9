@@ -9,6 +9,7 @@ import Interp exposing (..)
 import Dict exposing (..)
 import Debug
 
+bigTest : String
 bigTest = """
 {local
   {countToZeroPos {(countToZeroPos x) =>
@@ -126,8 +127,14 @@ interpTests  = describe "tests for interp module" [
         \_ ->  case parse "{local {z 7} in {() => z}}" of
                     Ok expr -> Expect.equal (Ok (CloV [] (IdC "z") (Dict.fromList [("z", NumV 7)])))
                                 (interp expr Dict.empty)
-                    Err e -> Expect.fail ("unexpected parse error")
+                    Err _ -> Expect.fail ("unexpected parse error")
     ]]
+
+fibTest : String
+fibTest = """ {local {fib {(rec n) =>
+                       {if {<= n 1}
+                               n
+                               {+ {rec rec {- n 1}} {rec rec {- n 2}}}}}} in {fib fib 7}}"""
 
 topInterpTests: Test
 topInterpTests = describe "tests for top-interp" [
@@ -138,4 +145,56 @@ topInterpTests = describe "tests for top-interp" [
     describe "test closure top interp" [
         test "top interp closure" <|
         \_ -> Expect.equal (Ok "#<procedure>") (topInterp "{local {z 7} in {() => z}}")
+    ],
+    describe "equals? tests" [
+        test "closures" <|
+        \_ -> Expect.equal (Ok "false") (topInterp "{equal? {() => 5} {() => 5}}"),
+        test "primops" <|
+        \_ -> Expect.equal (Ok "false") (topInterp "{equal? + +}"),
+        test "strings" <|
+        \_ -> Expect.equal (Ok "true") (topInterp "{equal? \"string1\" \"string1\"}"),
+        test "numbers" <|
+        \_ -> Expect.equal (Ok "true") (topInterp "{equal? 3 3})"),
+        test "numers2" <|
+        \_ -> Expect.equal (Ok "false") (topInterp "{equal? 0 1}"),
+        test "booleans" <|
+        \_ -> Expect.equal (Ok "true") (topInterp "{equal? true true}")
+    ],
+    describe "leq tests" [
+        test "less than" <|
+        \_ -> Expect.equal (Ok "true") (topInterp "{<= 3 4}"),
+        test "equal to" <|
+        \_ -> Expect.equal (Ok "true") (topInterp "{<= 10 10}"),
+        test "greater than" <|
+        \_ -> Expect.equal (Ok "false") (topInterp "{<= 11 10}")
+    ],
+    describe "Error tests" [
+        test "invalid type leq" <|
+        \_ -> Expect.err (topInterp "{<= \"s\" 3}"),
+        test "wrong num args plus" <|
+        \_ -> Expect.err (topInterp "{+ 3 4 5}"),
+        test "wrong num args equal" <|
+        \_ -> Expect.err (topInterp "{equal? 2 3 7}"),
+        test "div by zero" <|
+        \_ -> Expect.err (topInterp "{\\ 5 0}"),
+        test "user error" <|
+        \_ -> Expect.err (topInterp "{error \"something bad happened\"}"),
+        test "error wrong num args" <|
+        \_ -> Expect.err (topInterp "{error 2 3}")
+    ],
+    describe "big test" [
+        test "topInterp big test" <|
+        \_ -> Expect.equal (Ok "3") (topInterp bigTest),
+        test "fib test" <|
+        \_ -> Expect.equal (Ok "13") (topInterp fibTest)
+    ],
+    describe "primop binding" [
+        test "bind + to id" <|
+        \_ -> Expect.equal (Ok "4") (topInterp "{local {add +} in {add 2 2}}")
+    ],
+    describe "serializing tests" [
+        test "primop serialize" <|
+        \_ -> Expect.equal (Ok "#<primop>") (topInterp "+"),
+        test "closure serialize" <|
+        \_ -> Expect.equal (Ok "#<procedure>") (topInterp "{() => 5}")
     ]]
