@@ -1,6 +1,7 @@
 module Interp exposing (..)
 import Parse exposing (..)
 import Dict exposing (..)
+import Result exposing (andThen)
 
 {- 
 values:
@@ -29,19 +30,11 @@ lookup name env = case Dict.get name env of
                     Just val -> Ok val
                     Nothing -> Err (InterpError ("unbound identifier " ++ name))
 
-returnResult: Value -> Result InterpError Value
-returnResult val = Ok val
-
-bindResult: Result e a -> (a -> Result e b) -> Result e b
-bindResult r1 fn = case r1 of
-    Ok v -> fn v
-    Err e -> Err e
-
 mapResult: List Expr -> (Expr -> Result InterpError Value) -> Result InterpError (List Value)
 mapResult exprs evalFn = case exprs of
                             [] -> Ok []
-                            expr :: remainExprs -> bindResult (evalFn expr)
-                                (\curVal -> bindResult (mapResult remainExprs evalFn)
+                            expr :: remainExprs -> (evalFn expr) |> andThen
+                                (\curVal -> (mapResult remainExprs evalFn) |> andThen
                                     (\nextVals -> 
                                         Ok (curVal :: nextVals)))
 
@@ -55,21 +48,19 @@ interp expr env =
         NumC n -> Ok (NumV n)
         LamC args body ->
             Ok (CloV args body env)
-        IfC cond thn els -> bindResult
-            (interp cond env)
+        IfC cond thn els -> 
+            (interp cond env) |> andThen
             (\condVal -> case condVal of
                             BoolV True -> interp thn env 
                             BoolV False -> interp els env
                             _ -> Err (InterpError "invalid type for condition cond"))
-        AppC fnExpr fnArgs -> bindResult
-                (interp fnExpr env)
+        AppC fnExpr fnArgs -> (interp fnExpr env) |> andThen
                 (\fnVal -> case fnVal of 
-                            CloV cloArgs cloBody cloEnv -> bindResult 
-                                        (mapResult fnArgs (\e -> interp e env))
+                            CloV cloArgs cloBody cloEnv ->  (mapResult fnArgs (\e -> interp e env)) |> andThen
                                             (\evaledArgs -> 
                                                 let newEnv = extendEnv cloEnv (List.map2 Tuple.pair cloArgs evaledArgs) in
                                                     interp cloBody newEnv)
-                            PrimopV op -> bindResult (mapResult fnArgs (\e -> interp e env)) (interpPrimop op)
+                            PrimopV op -> (mapResult fnArgs (\e -> interp e env)) |> andThen (interpPrimop op)
                             _ -> Err (InterpError "Invalid function call"))
 
 serialize: Value -> String
@@ -96,7 +87,7 @@ topEnv = Dict.fromList [
 topInterp: String -> Result InterpError String
 topInterp expr =
     case parse expr of
-       Ok ast -> bindResult (interp ast topEnv) (serialize >> Ok)
+       Ok ast -> (interp ast topEnv) |> andThen (serialize >> Ok)
        Err _ -> Err (InterpError "Parse Error")
 
 -- Primop Code
@@ -125,7 +116,6 @@ typecheckBinaryNumPrimop vals op =
         (NumV n1, NumV n2) -> Ok (NumV (op n1 n2))
         _ -> Err (InterpError ("Invalid Arg Type:" ++ (serialize v1) ++ " " ++ (serialize v2)))
     _ -> Err (InterpError "Wrong number of args")
-
 
 primAdd: PrimitiveFunc
 primAdd args = typecheckBinaryNumPrimop args (+)
